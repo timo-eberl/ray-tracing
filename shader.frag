@@ -131,74 +131,69 @@ bool traceMin(Ray ray) {
 		|| intersectSphere(ray, sphere4Pos, sphereRadius, intersection);
 }
 
-bool trace(Ray ray, out ObjectIntersection o) {
-	// the size should ideally match the number of objects in the scene
-	// heavy performance impact
-	ObjectIntersection[4] intersections;
-	int intersectionsSize = 0;
+bool trace(Ray ray, out ObjectIntersection closestObject) {
+	const float MAX_DIST = 1000000.0;
+	float closestDistance = MAX_DIST;
 
 	Intersection intersection;
 	// ground
 	if (intersectGround(ray, intersection)) {
-		intersections[intersectionsSize] = ObjectIntersection(
-			intersection,
-			groundMaterial
-		);
-		intersections[intersectionsSize].material.albedoColor
-			= checkerBoardTexture( intersection.p.xz / 1.75 );
-		intersectionsSize++;
+		float d = distance(intersection.p, ray.p);
+		if (d < closestDistance) {
+			closestObject = ObjectIntersection(
+				intersection,
+				groundMaterial
+			);
+			closestObject.material.albedoColor = checkerBoardTexture( intersection.p.xz / 1.75 );
+			closestDistance = d;
+		}
 	}
 	// sphere 1
 	if (intersectSphere(ray, sphere1Pos, sphereRadius, intersection)) {
-		intersections[intersectionsSize] = ObjectIntersection(
-			intersection,
-			sphere1Material
-		);
-		intersectionsSize++;
+		float d = distance(intersection.p, ray.p);
+		if (d < closestDistance) {
+			closestObject = ObjectIntersection(
+				intersection,
+				sphere1Material
+			);
+			closestDistance = d;
+		}
 	}
 	// sphere 2
 	if (intersectSphere(ray, sphere2Pos, sphereRadius, intersection)) {
-		intersections[intersectionsSize] = ObjectIntersection(
-			intersection,
-			sphere2Material
-		);
-		intersectionsSize++;
+		float d = distance(intersection.p, ray.p);
+		if (d < closestDistance) {
+			closestObject = ObjectIntersection(
+				intersection,
+				sphere2Material
+			);
+			closestDistance = d;
+		}
 	}
 	// sphere 3
 	if (intersectSphere(ray, sphere3Pos, sphereRadius, intersection)) {
-		intersections[intersectionsSize] = ObjectIntersection(
-			intersection,
-			sphere3Material
-		);
-		intersectionsSize++;
+		float d = distance(intersection.p, ray.p);
+		if (d < closestDistance) {
+			closestObject = ObjectIntersection(
+				intersection,
+				sphere3Material
+			);
+			closestDistance = d;
+		}
 	}
 	// sphere 4
 	if (intersectSphere(ray, sphere4Pos, sphereRadius, intersection)) {
-		intersections[intersectionsSize] = ObjectIntersection(
-			intersection,
-			sphere4Material
-		);
-		intersectionsSize++;
-	}
-
-	int closestIndex;
-	const float MAX_DIST = 1000000.0;
-	float closestDistance = MAX_DIST;
-	for (int i = 0; i < intersectionsSize; i++) {
-		float d = distance(intersections[i].intersection.p, ray.p);
+		float d = distance(intersection.p, ray.p);
 		if (d < closestDistance) {
-			closestIndex = i;
+			closestObject = ObjectIntersection(
+				intersection,
+				sphere4Material
+			);
 			closestDistance = d;
 		}
 	}
 
-	if (closestDistance >= MAX_DIST) {
-		return false; // no intersection
-	}
-	else {
-		o = intersections[closestIndex];
-		return true;
-	}
+	return closestDistance < MAX_DIST; // if closestDistance is the same, there's no intersection
 }
 
 vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
