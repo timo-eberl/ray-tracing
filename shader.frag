@@ -14,52 +14,45 @@ struct Material { // factors should add up to 1.0
 	float reflectionFactor;
 	float refractionFactor;
 	float refractiveIndex;
+	vec3 albedoColor;
 };
 struct ObjectIntersection {
 	Intersection intersection;
 	Material material;
-	vec3 albedoColor;
 };
 
 // scene data
 const vec3 lightDirection = normalize(vec3(0.3, 1, 0.3));
-const vec3 sphere1Pos = vec3(-1.0,1,0);
-const vec3 sphere2Pos = vec3( 1.0,1,0);
-const float sphereRadius = 0.999;
+const vec3 sphere1Pos = vec3(-1.0,1,1);
+const vec3 sphere2Pos = vec3( 1.0,1,1);
+const vec3 sphere3Pos = vec3(-1.0,1,-1);
+const vec3 sphere4Pos = vec3( 1.0,1,-1);
+const float sphereRadius = 0.85;
 const Material groundMaterial = Material(
 	1.0, 0.0, 0.0, // diff refl refr
-	1.0 // refractive index
+	1.0, // refractive index
+	vec3(1.0)
 );
 const Material sphere1Material = Material(
 	0.2, 0.0, 0.8, // diff refl refr
-	1.2 // refractive index
+	1.3, // refractive index
+	vec3(0.3)
 );
 const Material sphere2Material = Material(
-	0.2, 0.8, 0.0, // diff refl refr
-	1.2 // refractive index
+	0.3, 0.7, 0.0, // diff refl refr
+	1.3, // refractive index
+	vec3(0.3)
 );
-
-float longitudeFromDirection(vec3 dir) {
-	return atan(-dir.z, dir.x) + 3.141; // [0;2pi]
-}
-
-float latitudeFromDirection(vec3 dir) {
-	// [-pi/2;pi/2]
-	// -pi/2 means 90° south
-	//  pi/2 means 90° north
-	return atan(dir.y, length(dir.xz));
-}
-
-vec2 sphereMapUV(vec3 position) {
-	vec3 dir = normalize(position);
-	float longitude = longitudeFromDirection(dir);
-	float latitude = latitudeFromDirection(dir);
-
-	float u = (longitude / 3.141) * 0.5; // [0;1]
-	float v = (latitude / (3.141*0.5)) * 0.5 + 0.5; // [0;1]
-
-	return vec2(u, v);
-}
+const Material sphere3Material = Material(
+	1.0, 0.0, 0.0, // diff refl refr
+	1.3, // refractive index
+	vec3(0.5,0,0.1)
+);
+const Material sphere4Material = Material(
+	0.8, 0.2, 0.0, // diff refl refr
+	1.3, // refractive index
+	vec3(0.5,0.5,0.3)
+);
 
 vec3 checkerBoardTexture(vec2 uv) {
 	// ^^ means xor
@@ -133,11 +126,15 @@ bool traceMin(Ray ray) {
 	Intersection intersection;
 	return intersectGround(ray, intersection)
 		|| intersectSphere(ray, sphere1Pos, sphereRadius, intersection)
-		|| intersectSphere(ray, sphere2Pos, sphereRadius, intersection);
+		|| intersectSphere(ray, sphere2Pos, sphereRadius, intersection)
+		|| intersectSphere(ray, sphere3Pos, sphereRadius, intersection)
+		|| intersectSphere(ray, sphere4Pos, sphereRadius, intersection);
 }
 
 bool trace(Ray ray, out ObjectIntersection o) {
-	ObjectIntersection[3] intersections;
+	// the size should ideally match the number of objects in the scene
+	// heavy performance impact
+	ObjectIntersection[4] intersections;
 	int intersectionsSize = 0;
 
 	Intersection intersection;
@@ -145,17 +142,17 @@ bool trace(Ray ray, out ObjectIntersection o) {
 	if (intersectGround(ray, intersection)) {
 		intersections[intersectionsSize] = ObjectIntersection(
 			intersection,
-			groundMaterial,
-			checkerBoardTexture(intersection.p.xz / 1.75)
+			groundMaterial
 		);
+		intersections[intersectionsSize].material.albedoColor
+			= checkerBoardTexture( intersection.p.xz / 1.75 );
 		intersectionsSize++;
 	}
 	// sphere 1
 	if (intersectSphere(ray, sphere1Pos, sphereRadius, intersection)) {
 		intersections[intersectionsSize] = ObjectIntersection(
 			intersection,
-			sphere1Material,
-			vec3(0.3)
+			sphere1Material
 		);
 		intersectionsSize++;
 	}
@@ -163,8 +160,23 @@ bool trace(Ray ray, out ObjectIntersection o) {
 	if (intersectSphere(ray, sphere2Pos, sphereRadius, intersection)) {
 		intersections[intersectionsSize] = ObjectIntersection(
 			intersection,
-			sphere2Material,
-			vec3(0.3)
+			sphere2Material
+		);
+		intersectionsSize++;
+	}
+	// sphere 3
+	if (intersectSphere(ray, sphere3Pos, sphereRadius, intersection)) {
+		intersections[intersectionsSize] = ObjectIntersection(
+			intersection,
+			sphere3Material
+		);
+		intersectionsSize++;
+	}
+	// sphere 4
+	if (intersectSphere(ray, sphere4Pos, sphereRadius, intersection)) {
+		intersections[intersectionsSize] = ObjectIntersection(
+			intersection,
+			sphere4Material
 		);
 		intersectionsSize++;
 	}
@@ -201,7 +213,7 @@ void main() {
 	outColor = vec4(0,0,0,1);
 
 	float rayStrength = 1.0;
-	for (int i = 0; i < 100; i++) {
+	for (int i = 0; i < 10; i++) {
 		// draw closest object
 		ObjectIntersection closest;
 		if (trace(ray, closest)) {
@@ -211,7 +223,7 @@ void main() {
 				shadowRay.p += shadowRay.dir * 0.0001; // fix wrong self occlusion
 				bool isShadowed = traceMin(shadowRay);
 				outColor.xyz += shade(
-					closest.albedoColor, float(isShadowed), closest.intersection.n
+					closest.material.albedoColor, float(isShadowed), closest.intersection.n
 				) * closest.material.diffuseFactor * rayStrength;
 			}
 			if (closest.material.reflectionFactor <= 0.0
