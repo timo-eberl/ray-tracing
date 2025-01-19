@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Ray Tracing</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+	<h1>Ray Tracing</h1>
+
+	<p id="error" style="background-color: #bd2337; color: white;	padding: 1em;"></p>
+
+	<canvas></canvas>
+</body>
+
+<!-- put scripts at the end, so they can reference html elements -->
+<script>
+	// check if the static file server is configured correctly
+	if (!location.hostname) {
+		displayError(
+			"You need to open this page with a local static file server!"
+			+ " For more information check the README."
+		);
+	}
+
+	function displayError(text) {
+		// display errors in the html document, so they can't be missed
+		document.querySelector("#error").textContent = text;
+		console.error(text);
+	}
+</script>
+
+<script src="utils.js"></script>
+<script src="mesh-data.js"></script>
+<script src="matrix-lib.js"></script>
+<script src="main.js"></script>
+
+</html>

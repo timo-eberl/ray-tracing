@@ -1,0 +1,41 @@
+body {
+	text-align: center;
+	font-family: Arial, Helvetica, sans-serif;
+	margin: 0;
+	background-color: var(--default-background-color);
+	color: var(--default-font-color);
+}
+
+canvas {
+	display: block;
+	margin: auto;
+	/* if the canvas is too wide to fit on the page, scale it down */
+	max-width: 100%;
+	width: 50rem;
+}
+
+#error {
+	margin: 2em 20%;
+}
+
+#error:empty {
+	display: none; /* if no text is set, hide */
+}
+
+label {
+	margin-left: 3em;
+}
+
+/* default color scheme */
+:root {
+	--default-font-color: #303030;
+	--default-background-color: #e9e9e9;
+}
+
+/* dark color scheme (depending on browser settings) */
+@media (prefers-color-scheme: dark) {
+	:root {
+		--default-font-color: #cac5be;
+		--default-background-color: #181a1b;
+	}
+}
