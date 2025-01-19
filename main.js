@@ -16,6 +16,7 @@ let uniformCameraDistanceLocation;
 
 let cameraDistance = 5;
 let cameraRotation = { x: 15, y: 0 };
+let cameraTarget = { x: 0, y: 1, z: 0 };
 let isMouseDown = false;
 
 function setupCameraControls() {
@@ -72,6 +73,7 @@ async function initialize() {
 	uniformAspectRatioLocation = gl.getUniformLocation(program, "u_aspectRatio");
 	uniformCameraRotationLocation = gl.getUniformLocation(program, "u_cameraRotation");
 	uniformCameraDistanceLocation = gl.getUniformLocation(program, "u_cameraDistance");
+	uniformCameraTargetLocation = gl.getUniformLocation(program, "u_cameraTarget");
 }
 
 function uploadAttributeData() {
@@ -148,6 +150,7 @@ function setUniforms() {
 		cameraRotation.x  * Math.PI / 180, cameraRotation.y  * Math.PI / 180
 	]);
 	gl.uniform1fv(uniformCameraDistanceLocation, [ cameraDistance ]);
+	gl.uniform3fv(uniformCameraTargetLocation, [ cameraTarget.x, cameraTarget.y, cameraTarget.z ]);
 }
 
 main();

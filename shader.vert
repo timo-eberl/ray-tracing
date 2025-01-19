@@ -6,6 +6,7 @@ in vec2 a_uv;
 uniform float u_aspectRatio;
 uniform vec2 u_cameraRotation;
 uniform float u_cameraDistance;
+uniform vec3 u_cameraTarget;
 
 out vec3 v_rayPosition;
 out vec3 v_rayDirection;
@@ -56,7 +57,10 @@ Ray makePerspectiveRay(
 	forward = forward * focalLength;
 	// center on (0.0) ; make the y range from -1 to 1 and point upwards
 	vec2 xy = (p_uv - vec2(0.5)) * vec2(2, 2);
-	return Ray(rotation * vec3(0,0,p_cameraDistance), forward + xy.x * right + xy.y * up);
+	return Ray(
+		rotation * vec3(0,0,p_cameraDistance) + u_cameraTarget,
+		forward + xy.x * right + xy.y * up
+	);
 }
 
 void main() {
