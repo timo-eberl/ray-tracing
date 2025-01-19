@@ -7,17 +7,22 @@ in vec3 v_rayDirection;
 
 out vec4 outColor;
 
+// scene data
+const vec3 lightDirection = normalize(vec3(0.3, 1, 0.3));
+const vec3 spherePos = vec3(0,1,0);
+const float sphereRadius = 1.0;
+
 struct Ray { vec3 p; vec3 dir; };
 struct Intersection { vec3 p; vec3 n; };
 struct Material { // factors should add up to 1.0
 	float diffuseFactor;
 	float reflectionFactor;
 	float refractionFactor;
+	vec3 albedoColor;
 };
 struct ObjectIntersection {
 	Intersection intersection;
 	Material material;
-	vec3 albedoColor;
 };
 
 float longitudeFromDirection(vec3 dir) {
@@ -70,7 +75,7 @@ bool intersectGround(Ray ray, out Intersection intersection) {
 	if (abs(intersection.p.x) > 2.5 || abs(intersection.p.z) > 2.5) {
 		return false;
 	}
-	intersection.n = vec3(0, ray.p.y > 0.0 ? 1 : 0, 0);
+	intersection.n = vec3(0, ray.p.y > 0.0 ? 1 : -1, 0);
 	return true;
 }
 
@@ -110,6 +115,12 @@ bool intersectSphere(Ray ray, vec3 center, float radius, out Intersection inters
 	return true;
 }
 
+bool traceMin(Ray ray) {
+	Intersection intersection;
+	return intersectGround(ray, intersection)
+		|| intersectSphere(ray, spherePos, sphereRadius, intersection);
+}
+
 bool trace(Ray ray, out ObjectIntersection o) {
 	ObjectIntersection[2] intersections;
 	int intersectionsSize = 0;
@@ -118,25 +129,26 @@ bool trace(Ray ray, out ObjectIntersection o) {
 	Intersection groundIntersection;
 	bool isGroundHit = intersectGround(ray, groundIntersection);
 	if (isGroundHit) {
-		Material mat = Material(1.0, 0.0, 0.0);
 		intersections[intersectionsSize] = ObjectIntersection(
 			groundIntersection,
-			Material(1.0, 0.0, 0.0),
-			checkerBoardTexture(groundIntersection.p.xz)
+			Material(
+				1.0, 0.0, 0.0, 
+				checkerBoardTexture(groundIntersection.p.xz)
+			)
 		);
 		intersectionsSize++;
 	}
 
 	// intersect sphere
-	vec3 spherePos = vec3(0,1,0);
 	Intersection sphereIntersection;
-	bool isSphereHit = intersectSphere(ray, spherePos, 1.0, sphereIntersection);
+	bool isSphereHit = intersectSphere(ray, spherePos, sphereRadius, sphereIntersection);
 	if (isSphereHit) {
-		Material mat = Material(1.0, 0.0, 0.0);
 		intersections[intersectionsSize] = ObjectIntersection(
 			sphereIntersection,
-			Material(1.0, 0.0, 0.0),
-			checkerBoardTexture(sphereMapUV(sphereIntersection.p - spherePos) * 5.0)
+			Material(
+				1.0, 0.0, 0.0,
+				checkerBoardTexture(sphereMapUV(sphereIntersection.p - spherePos) * 5.0)
+			)
 		);
 		intersectionsSize++;
 	}
@@ -161,11 +173,9 @@ bool trace(Ray ray, out ObjectIntersection o) {
 	}
 }
 
-const vec3 lightDirection = normalize(vec3(1, 1, 1));
-
 vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
 	float diffuse = max(0.0, dot(normal, lightDirection)) * mix(1.0, 0.0, occlusion);
-	float ambient = 0.2;
+	float ambient = 0.4;
 	return (diffuse + ambient) * albedo;
 }
 
@@ -176,7 +186,12 @@ void main() {
 	// draw closest object
 	ObjectIntersection closest;
 	if (trace(ray, closest)) {
-		outColor.xyz = shade(closest.albedoColor, 0.0, closest.intersection.n);
+		Ray shadowRay = Ray(closest.intersection.p, lightDirection);
+		shadowRay.p += shadowRay.dir * 0.0001; // fix wrong self shadowing
+		bool isShadowed = traceMin(shadowRay);
+		outColor.xyz = shade(
+			closest.material.albedoColor, float(isShadowed), closest.intersection.n
+		) * closest.material.diffuseFactor;
 	}
 	else {
 		// draw sky
