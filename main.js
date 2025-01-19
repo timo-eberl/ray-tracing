@@ -15,7 +15,7 @@ let uniformCameraRotationLocation;
 let uniformCameraDistanceLocation;
 
 let cameraDistance = 5;
-let cameraRotation = { x: 15, y: 30 };
+let cameraRotation = { x: 15, y: 0 };
 let isMouseDown = false;
 
 function setupCameraControls() {

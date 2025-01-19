@@ -2,13 +2,23 @@
 
 precision highp float;
 
-in vec2 v_uv;
 in vec3 v_rayPosition;
 in vec3 v_rayDirection;
 
 out vec4 outColor;
 
 struct Ray { vec3 p; vec3 dir; };
+struct Intersection { vec3 p; vec3 n; };
+struct Material { // factors should add up to 1.0
+	float diffuseFactor;
+	float reflectionFactor;
+	float refractionFactor;
+};
+struct ObjectIntersection {
+	Intersection intersection;
+	Material material;
+	vec3 albedoColor;
+};
 
 float longitudeFromDirection(vec3 dir) {
 	return atan(-dir.z, dir.x) + 3.141; // [0;2pi]
@@ -35,8 +45,8 @@ vec2 sphereMapUV(vec3 position) {
 vec3 checkerBoardTexture(vec2 uv) {
 	// ^^ means xor
 	return fract(uv.x) > 0.5 ^^ fract(uv.y) > 0.5
-		? vec3(0.2)  // dark grey
-		: vec3(1.0); // white
+		? vec3(0.3)  // dark grey
+		: vec3(0.9); // white
 }
 
 vec3 sky(vec3 dir) {
@@ -51,16 +61,20 @@ vec3 sky(vec3 dir) {
 	}
 }
 
-bool intersectGround(Ray ray, out vec3 hitpoint) {
+bool intersectGround(Ray ray, out Intersection intersection) {
 	float t = (-ray.p.y) / (ray.dir.y);
-	if (t < 0.0) {
+	if (t <= 0.0) {
 		return false;
 	}
-	hitpoint = ray.p + t * ray.dir;
+	intersection.p = ray.p + t * ray.dir;
+	if (abs(intersection.p.x) > 2.5 || abs(intersection.p.z) > 2.5) {
+		return false;
+	}
+	intersection.n = vec3(0,1,0);
 	return true;
 }
 
-bool intersectSphere(Ray ray, vec3 center, float radius, out vec3 hitpoint) {
+bool intersectSphere(Ray ray, vec3 center, float radius, out Intersection intersection) {
 	// ray origin to sphere center
 	vec3 oc = ray.p - center;
 
@@ -87,8 +101,53 @@ bool intersectSphere(Ray ray, vec3 center, float radius, out vec3 hitpoint) {
 		return false;
 	}
 
-	hitpoint = ray.p + t * ray.dir;
+	intersection.p = ray.p + t * ray.dir;
+	intersection.n = normalize(intersection.p - center);
 	return true;
+}
+
+ObjectIntersection trace(Ray ray) {
+	ObjectIntersection[2] intersections;
+	int intersectionsSize = 0;
+
+	// intersect ground
+	Intersection groundIntersection;
+	bool isGroundHit = intersectGround(ray, groundIntersection);
+	if (isGroundHit) {
+		Material mat = Material(1.0, 0.0, 0.0);
+		intersections[intersectionsSize] = ObjectIntersection(
+			groundIntersection,
+			Material(1.0, 0.0, 0.0),
+			checkerBoardTexture(groundIntersection.p.xz)
+		);
+		intersectionsSize++;
+	}
+
+	// intersect sphere
+	vec3 spherePos = vec3(0,1,0);
+	Intersection sphereIntersection;
+	bool isSphereHit = intersectSphere(ray, spherePos, 1.0, sphereIntersection);
+	if (isSphereHit) {
+		Material mat = Material(1.0, 0.0, 0.0);
+		intersections[intersectionsSize] = ObjectIntersection(
+			sphereIntersection,
+			Material(1.0, 0.0, 0.0),
+			checkerBoardTexture(sphereMapUV(sphereIntersection.p - spherePos) * 5.0)
+		);
+		intersectionsSize++;
+	}
+
+	ObjectIntersection closestIntersection;
+	float closestDistance = 1000000.0;
+	for (int i = 0; i < intersectionsSize; i++) {
+		float d = distance(intersections[i].intersection.p, ray.p);
+		if (d < closestDistance) {
+			closestIntersection = intersections[i];
+			closestDistance = d;
+		}
+	}
+
+	return closestIntersection;
 }
 
 void main() {
@@ -96,22 +155,6 @@ void main() {
 
 	// draw sky
 	outColor = vec4(sky(ray.dir), 1.0);
-
-	// draw ground
-	vec3 groundIntersection;
-	if (intersectGround(ray, groundIntersection)) {
-		outColor.xyz = checkerBoardTexture(groundIntersection.xz);
-	}
-
-	// hack that only works for this scene:
-	// do not draw sphere if camera is below ground
-	if (ray.p.y < 0.0) return;
-
-	// draw sphere
-	vec3 sphereIntersection;
-	vec3 spherePos = vec3(0,1,0);
-	if (intersectSphere(ray, spherePos, 1.0, sphereIntersection)) {
-		vec2 uv = sphereMapUV(sphereIntersection - spherePos);
-		outColor.xyz = checkerBoardTexture(uv * 5.0);
-	}
+	// draw closest object
+	outColor.xyz = trace(ray).albedoColor;
 }

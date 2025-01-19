@@ -7,7 +7,6 @@ uniform float u_aspectRatio;
 uniform vec2 u_cameraRotation;
 uniform float u_cameraDistance;
 
-out vec2 v_uv;
 out vec3 v_rayPosition;
 out vec3 v_rayDirection;
 
@@ -56,16 +55,14 @@ Ray makePerspectiveRay(
 	right = right * p_aspect;
 	forward = forward * focalLength;
 	// center on (0.0) ; make the y range from -1 to 1 and point upwards
-	vec2 xy = (p_uv - vec2(0.5)) * vec2(2, -2);
+	vec2 xy = (p_uv - vec2(0.5)) * vec2(2, 2);
 	return Ray(rotation * vec3(0,0,p_cameraDistance), forward + xy.x * right + xy.y * up);
 }
 
 void main() {
 	gl_Position = vec4(a_position, 1.0);
-	v_uv = a_uv;
-	v_uv.y = mix(1.0, 0.0, v_uv.y);
 
-	Ray ray = makePerspectiveRay(u_cameraRotation, u_cameraDistance, u_aspectRatio, 45.0, v_uv);
+	Ray ray = makePerspectiveRay(u_cameraRotation, u_cameraDistance, u_aspectRatio, 45.0, a_uv);
 	v_rayPosition = ray.p;
 	v_rayDirection = ray.dir;
 }
