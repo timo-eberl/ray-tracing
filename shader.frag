@@ -70,7 +70,7 @@ bool intersectGround(Ray ray, out Intersection intersection) {
 	if (abs(intersection.p.x) > 2.5 || abs(intersection.p.z) > 2.5) {
 		return false;
 	}
-	intersection.n = vec3(0,1,0);
+	intersection.n = vec3(0, ray.p.y > 0.0 ? 1 : 0, 0);
 	return true;
 }
 
@@ -102,11 +102,15 @@ bool intersectSphere(Ray ray, vec3 center, float radius, out Intersection inters
 	}
 
 	intersection.p = ray.p + t * ray.dir;
-	intersection.n = normalize(intersection.p - center);
+	intersection.n = normalize(intersection.p - center); // normal pointing outward
+	// flip normal if the ray is coming from inside
+	if (dot(ray.dir, intersection.n) > 0.0) {
+		intersection.n = -intersection.n;
+	}
 	return true;
 }
 
-ObjectIntersection trace(Ray ray) {
+bool trace(Ray ray, out ObjectIntersection o) {
 	ObjectIntersection[2] intersections;
 	int intersectionsSize = 0;
 
@@ -137,24 +141,45 @@ ObjectIntersection trace(Ray ray) {
 		intersectionsSize++;
 	}
 
-	ObjectIntersection closestIntersection;
-	float closestDistance = 1000000.0;
+	int closestIndex;
+	const float MAX_DIST = 1000000.0;
+	float closestDistance = MAX_DIST;
 	for (int i = 0; i < intersectionsSize; i++) {
 		float d = distance(intersections[i].intersection.p, ray.p);
 		if (d < closestDistance) {
-			closestIntersection = intersections[i];
+			closestIndex = i;
 			closestDistance = d;
 		}
 	}
 
-	return closestIntersection;
+	if (closestDistance >= MAX_DIST) {
+		return false; // no intersection
+	}
+	else {
+		o = intersections[closestIndex];
+		return true;
+	}
+}
+
+const vec3 lightDirection = normalize(vec3(1, 1, 1));
+
+vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
+	float diffuse = max(0.0, dot(normal, lightDirection)) * mix(1.0, 0.0, occlusion);
+	float ambient = 0.2;
+	return (diffuse + ambient) * albedo;
 }
 
 void main() {
 	Ray ray = Ray(v_rayPosition, normalize(v_rayDirection));
 
-	// draw sky
-	outColor = vec4(sky(ray.dir), 1.0);
+	outColor.w = 1.0;
 	// draw closest object
-	outColor.xyz = trace(ray).albedoColor;
+	ObjectIntersection closest;
+	if (trace(ray, closest)) {
+		outColor.xyz = shade(closest.albedoColor, 0.0, closest.intersection.n);
+	}
+	else {
+		// draw sky
+		outColor.xyz = sky(ray.dir);
+	}
 }
