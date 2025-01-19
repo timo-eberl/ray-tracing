@@ -133,6 +133,26 @@ function setupCameraControls() {
 	};
 }
 
+const quadMesh = {
+	positions: [
+		// x     y     z
+		-1.0,  1.0,  0.0, // 0 - top left
+		-1.0, -1.0,  0.0, // 1 - bottom left
+		 1.0, -1.0,  0.0, // 2 - bottom right
+		 1.0,  1.0,  0.0, // 3 - top right
+	],
+	uvs: [
+		0.0, 1.0,
+		0.0, 0.0,
+		1.0, 0.0,
+		1.0, 1.0,
+	],
+	indices: [
+		0, 1, 2,
+		2, 3, 0,
+	],
+};
+
 async function initialize() {
 	setupCameraControls();
 
@@ -214,8 +234,7 @@ function render(time) {
 }
 
 function setUniforms() {
-	const canvas = document.querySelector("canvas");
-	const aspectRatio = canvas.width / canvas.height;
+	const aspectRatio = gl.canvas.width / gl.canvas.height;
 
 	gl.uniform1fv(uniformAspectRatioLocation, [ aspectRatio ]);
 	gl.uniform2fv(uniformCameraRotationLocation, [
