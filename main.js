@@ -13,6 +13,7 @@ let uniformProjectionMatrixLocation;
 let uniformAspectRatioLocation;
 let uniformCameraRotationLocation;
 let uniformCameraDistanceLocation;
+let uniformCameraTargetLocation;
 
 let cameraDistance = 5;
 let cameraRotation = { x: 15, y: 0 };
@@ -39,6 +40,97 @@ function setupCameraControls() {
 		delta += 1.0; // [0.9 - 1.1]
 		cameraDistance *= delta;
 	}
+
+	// track touch events
+	let primaryTouch = { identifier: undefined, x: 0, y:0 };
+	let secondaryTouch = { identifier: undefined, x: 0, y: 0 };
+	document.ontouchstart = function(event) {
+		if (primaryTouch.identifier === undefined) {
+			primaryTouch.identifier = event.changedTouches[0].identifier;
+			primaryTouch.x = event.changedTouches[0].clientX;
+			primaryTouch.y = event.changedTouches[0].clientY;
+		}
+		else if (secondaryTouch.identifier === undefined) {
+			secondaryTouch.identifier = event.changedTouches[0].identifier;
+			secondaryTouch.x = event.changedTouches[0].clientX;
+			secondaryTouch.y = event.changedTouches[0].clientY;
+		}
+	};
+	function touchend(event) {
+		if (primaryTouch.identifier === event.changedTouches[0].identifier) {
+			primaryTouch.identifier = undefined;
+			if (secondaryTouch.identifier !== undefined) {
+				primaryTouch.identifier = secondaryTouch.identifier;
+				primaryTouch.x = secondaryTouch.x;
+				primaryTouch.y = secondaryTouch.y;
+				secondaryTouch.identifier = undefined;
+			}
+		}
+		if (secondaryTouch.identifier === event.changedTouches[0].identifier) {
+			secondaryTouch.identifier = undefined;
+		}
+	}
+	// measure touch movements, rotate and zoom accordingly
+	document.ontouchend = touchend;
+	document.ontouchcancel = touchend;
+	document.ontouchmove = function (event) {
+		let primaryMovement = { x: 0, y: 0 };
+		let secondaryMovement = { x: 0, y: 0 };
+		const touches = event.changedTouches;
+		// note that sometimes multiple events are generated for one touch point
+		for (let i = 0; i < touches.length; i++) {
+			const element = touches[i];
+			if (primaryTouch.identifier === element.identifier) {
+				primaryMovement.x += (element.clientX - primaryTouch.x);
+				primaryMovement.y += (element.clientY - primaryTouch.y);
+				primaryTouch.x = element.clientX;
+				primaryTouch.y = element.clientY;
+			}
+			else if (secondaryTouch.identifier === element.identifier) {
+				secondaryMovement.x += (element.clientX - secondaryTouch.x);
+				secondaryMovement.y += (element.clientY - secondaryTouch.y);
+				secondaryTouch.x = element.clientX;
+				secondaryTouch.y = element.clientY;
+			}
+		}
+
+		if (primaryMovement.x === 0 && primaryMovement.y === 0
+				&& secondaryMovement.x === 0 && secondaryMovement.y === 0) {
+			return;
+		}
+
+		// one touch point - only rotate
+		if (primaryTouch.identifier !== undefined && secondaryTouch.identifier === undefined) {
+			cameraRotation.x += primaryMovement.y * 0.2;
+			cameraRotation.y += primaryMovement.x * 0.2;
+		}
+		// two touch points - rotate and zoom
+		else if (primaryTouch.identifier !== undefined && secondaryTouch.identifier !== undefined) {
+			// rotate
+			cameraRotation.x += primaryMovement.y * 0.1;
+			cameraRotation.y += primaryMovement.x * 0.1;
+			cameraRotation.x += secondaryMovement.y * 0.1;
+			cameraRotation.y += secondaryMovement.x * 0.1;
+
+			// 2d vector helper functions
+			function dot(a,b) { return a.x * b.x + a.y * b.y; };
+			function subtract(a,b) { return { x: a.x - b.x, y: a.y - b.y } };
+			function normalize(v) {
+				const length = Math.sqrt(v.x*v.x + v.y*v.y);
+				return { x: v.x/length, y: v.y/length };
+			};
+
+			// zoom
+			const primPos = { x: primaryTouch.x, y: primaryTouch.y };
+			const secPos = { x: secondaryTouch.x, y: secondaryTouch.y };
+			const primToSec = dot(primaryMovement, normalize(subtract(secPos, primPos)));
+			const secToPrim = dot(secondaryMovement, normalize(subtract(primPos, secPos)));
+			let delta = - primToSec - secToPrim; // negative = zoom out, positive = zoom in
+			delta *= -0.002;
+			delta += 1.0;
+			cameraDistance *= delta;
+		}
+	};
 }
 
 async function initialize() {
@@ -49,22 +141,18 @@ async function initialize() {
 	gl = canvas.getContext("webgl2", { alpha: false });
 
 	if (!gl) { console.error("Your browser does not support WebGL2"); }
-	// set the resolution of the html canvas element
-	canvas.width = 500; canvas.height = 350;
 
-	// set the resolution of the framebuffer
-	gl.viewport(0, 0, canvas.width, canvas.height);
+	window.onresize = function () {
+		gl.canvas.width = window.innerWidth;
+		gl.canvas.height = window.innerHeight;
+		gl.viewport(0, 0, canvas.width, canvas.height);
+	};
+	window.onresize()
 
-	gl.enable(gl.DEPTH_TEST); // enable z-buffering
-	gl.enable(gl.CULL_FACE); // enable back-face culling
-
-	// loadTextResource returns a string that contains the content of a text file
 	const vertexShaderText = await loadTextResource("shader.vert");
 	const fragmentShaderText = await loadTextResource("shader.frag");
-	// compile GLSL shaders - turn shader code into machine code that the GPU understands
 	const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderText);
 	const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderText);
-	// link the two shaders - create a program that uses both shaders
 	program = createProgram(gl, vertexShader, fragmentShader);
 
 	uploadAttributeData();
@@ -126,22 +214,6 @@ function render(time) {
 }
 
 function setUniforms() {
-	// use row-major notation (like in maths)
-	const modelMatrix = [
-		1,0,0,0,
-		0,1,0,0,
-		0,0,1,0,
-		0,0,0,1,
-	];
-
-	const vT = mat4Translation(0,0,-cameraDistance);
-	const vRy = mat4RotY(cameraRotation.y * Math.PI / 180);
-	const vRx = mat4RotX(cameraRotation.x * Math.PI / 180);
-	const viewMatrix = mat4Mul(vT, mat4Mul(vRx, vRy));
-
-	// we set transpose to true to convert to column-major
-	gl.uniformMatrix4fv(uniformModelMatrixLocation, true, modelMatrix);
-
 	const canvas = document.querySelector("canvas");
 	const aspectRatio = canvas.width / canvas.height;
 

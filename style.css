@@ -8,10 +8,9 @@ body {
 
 canvas {
 	display: block;
-	margin: auto;
-	/* if the canvas is too wide to fit on the page, scale it down */
-	max-width: 100%;
-	width: 50rem;
+	touch-action: none; /* disables reloading and zooming */
+	width: 100%;
+	height: 100%;
 }
 
 #error {

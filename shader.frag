@@ -23,16 +23,20 @@ struct ObjectIntersection {
 
 // scene data
 const vec3 lightDirection = normalize(vec3(0.3, 1, 0.3));
-const vec3 sphere1Pos = vec3(-1,1,0);
-const vec3 sphere2Pos = vec3( 1,1,0);
-const float sphereRadius = 1.0;
+const vec3 sphere1Pos = vec3(-1.0,1,0);
+const vec3 sphere2Pos = vec3( 1.0,1,0);
+const float sphereRadius = 0.999;
 const Material groundMaterial = Material(
 	1.0, 0.0, 0.0, // diff refl refr
 	1.0 // refractive index
 );
-const Material sphereMaterial = Material(
+const Material sphere1Material = Material(
+	0.2, 0.0, 0.8, // diff refl refr
+	1.2 // refractive index
+);
+const Material sphere2Material = Material(
 	0.2, 0.8, 0.0, // diff refl refr
-	1.5 // refractive index
+	1.2 // refractive index
 );
 
 float longitudeFromDirection(vec3 dir) {
@@ -142,7 +146,7 @@ bool trace(Ray ray, out ObjectIntersection o) {
 		intersections[intersectionsSize] = ObjectIntersection(
 			intersection,
 			groundMaterial,
-			checkerBoardTexture(intersection.p.xz / 2.5)
+			checkerBoardTexture(intersection.p.xz / 1.75)
 		);
 		intersectionsSize++;
 	}
@@ -150,7 +154,7 @@ bool trace(Ray ray, out ObjectIntersection o) {
 	if (intersectSphere(ray, sphere1Pos, sphereRadius, intersection)) {
 		intersections[intersectionsSize] = ObjectIntersection(
 			intersection,
-			sphereMaterial,
+			sphere1Material,
 			vec3(0.3)
 		);
 		intersectionsSize++;
@@ -159,7 +163,7 @@ bool trace(Ray ray, out ObjectIntersection o) {
 	if (intersectSphere(ray, sphere2Pos, sphereRadius, intersection)) {
 		intersections[intersectionsSize] = ObjectIntersection(
 			intersection,
-			sphereMaterial,
+			sphere2Material,
 			vec3(0.3)
 		);
 		intersectionsSize++;
@@ -216,14 +220,14 @@ void main() {
 			}
 			if (closest.material.reflectionFactor > 0.0) {
 				ray = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
-				ray.p += ray.dir * 0.001; // fix wrong self occlusion
+				ray.p += ray.dir * 0.0001; // fix wrong self occlusion
 				rayStrength *= closest.material.reflectionFactor;
 			}
 			// only handle reflection OR refraction (both is way more difficult)
 			else if (closest.material.refractionFactor > 0.0) {
 				float eta = 1.0 / closest.material.refractiveIndex;
 				ray = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
-				ray.p += ray.dir * 0.001; // fix wrong self occlusion
+				ray.p += ray.dir * 0.0001; // fix wrong self occlusion
 				rayStrength *= closest.material.refractionFactor;
 			}
 		}
