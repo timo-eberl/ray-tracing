@@ -34,12 +34,12 @@ const Material groundMaterial = Material(
 	vec3(1.0)
 );
 const Material sphere1Material = Material(
-	0.2, 0.0, 0.8, // diff refl refr
+	0.0, 0.2, 0.8, // diff refl refr
 	1.3, // refractive index
 	vec3(0.3)
 );
 const Material sphere2Material = Material(
-	0.3, 0.7, 0.0, // diff refl refr
+	0.0, 1.0, 0.0, // diff refl refr
 	1.3, // refractive index
 	vec3(0.3)
 );
@@ -202,15 +202,30 @@ vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
 	return (diffuse + ambient) * albedo;
 }
 
+struct RayTodo { Ray ray; float contribution; bool todo; };
+
 void main() {
-	Ray ray = Ray(v_rayPosition, normalize(v_rayDirection));
+	const int raysTodoSize = 10;
+	RayTodo[raysTodoSize] raysTodo;
+	for (int i = 0; i < raysTodoSize; i++) {
+		raysTodo[i].todo = false;
+	}
+	// primary ray
+	raysTodo[0] = RayTodo(
+		Ray(v_rayPosition, normalize(v_rayDirection)),
+		1.0, true
+	);
 
 	outColor = vec4(0,0,0,1);
 
-	float rayStrength = 1.0;
-	for (int i = 0; i < 10; i++) {
-		// draw closest object
+	for (int j = 0; j < raysTodoSize; j++) {
+		if (!raysTodo[j].todo) continue;
+
+		float contribution = raysTodo[j].contribution;
+		Ray ray = raysTodo[j].ray;
+
 		ObjectIntersection closest;
+		// intersection found: draw closest object
 		if (trace(ray, closest)) {
 			// diffuse shading
 			if (closest.material.diffuseFactor > 0.0) {
@@ -219,29 +234,37 @@ void main() {
 				bool isShadowed = traceMin(shadowRay);
 				outColor.xyz += shade(
 					closest.material.albedoColor, float(isShadowed), closest.intersection.n
-				) * closest.material.diffuseFactor * rayStrength;
+				) * closest.material.diffuseFactor * contribution;
 			}
-			if (closest.material.reflectionFactor <= 0.0
-					&& closest.material.refractionFactor <= 0.0) {
-				break;
-			}
+			// reflection
 			if (closest.material.reflectionFactor > 0.0) {
-				ray = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
-				ray.p += ray.dir * 0.0001; // fix wrong self occlusion
-				rayStrength *= closest.material.reflectionFactor;
+				Ray newRay = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
+				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
+				for (int k = j+1; k < raysTodoSize; k++) {
+					if (raysTodo[k].todo) continue;
+					raysTodo[k] = RayTodo(
+						newRay, contribution * closest.material.reflectionFactor, true
+					);
+					break;
+				}
 			}
-			// only handle reflection OR refraction (both is way more difficult)
-			else if (closest.material.refractionFactor > 0.0) {
+			// refraction
+			if (closest.material.refractionFactor > 0.0) {
 				float eta = 1.0 / closest.material.refractiveIndex;
-				ray = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
-				ray.p += ray.dir * 0.0001; // fix wrong self occlusion
-				rayStrength *= closest.material.refractionFactor;
+				Ray newRay = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
+				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
+				for (int k = j+1; k < raysTodoSize; k++) {
+					if (raysTodo[k].todo) continue;
+					raysTodo[k] = RayTodo(
+						newRay, contribution * closest.material.refractionFactor, true
+					);
+					break;
+				}
 			}
 		}
+		// no intersection found: draw sky
 		else {
-			// draw sky
-			outColor.xyz += sky(ray.dir) * rayStrength;
-			break;
+			outColor.xyz += sky(ray.dir) * contribution;
 		}
 	}
 }
