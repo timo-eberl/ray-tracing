@@ -1,7 +1,7 @@
 async function main() {
 	await initialize();
-	requestAnimationFrame(render);
 	measureFPSLoop();
+	requestAnimationFrame(render);
 }
 
 // this data is set in initialize() and used in render()
