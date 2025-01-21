@@ -143,23 +143,20 @@ function setupCameraControls() {
 	};
 }
 
-const quadMesh = {
+const triangleMesh = {
 	positions: [
 		// x     y     z
-		-1.0,  1.0,  0.0, // 0 - top left
+		-1.0,  3.0,  0.0, // 0 - top left
 		-1.0, -1.0,  0.0, // 1 - bottom left
-		 1.0, -1.0,  0.0, // 2 - bottom right
-		 1.0,  1.0,  0.0, // 3 - top right
+		 3.0, -1.0,  0.0, // 2 - bottom right
 	],
 	uvs: [
-		0.0, 1.0,
+		0.0, 2.0,
 		0.0, 0.0,
-		1.0, 0.0,
-		1.0, 1.0,
+		2.0, 0.0,
 	],
 	indices: [
 		0, 1, 2,
-		2, 3, 0,
 	],
 };
 
@@ -201,18 +198,18 @@ function uploadAttributeData() {
 	const indexBuffer = gl.createBuffer();
 	// gl.ELEMENT_ARRAY_BUFFER tells WebGL that this buffer should be treated as an index list
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(quadMesh.indices), gl.STATIC_DRAW);
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangleMesh.indices), gl.STATIC_DRAW);
 
 	const posBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadMesh.positions), gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleMesh.positions), gl.STATIC_DRAW);
 	const posAttributeLocation = gl.getAttribLocation(program, "a_position");
 	gl.vertexAttribPointer(posAttributeLocation, 3, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(posAttributeLocation);
 
 	const uvBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadMesh.uvs), gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleMesh.uvs), gl.STATIC_DRAW);
 	const uvAttributeLocation = gl.getAttribLocation(program, "a_uv");
 	gl.vertexAttribPointer(uvAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(uvAttributeLocation);
@@ -233,7 +230,7 @@ function render(time) {
 
 	setUniforms();
 	
-	const numVertices = quadMesh.indices.length;
+	const numVertices = triangleMesh.indices.length;
 	gl.drawElements(gl.TRIANGLES, numVertices, gl.UNSIGNED_SHORT, 0);
 
 	// unbind to avoid accidental modification
