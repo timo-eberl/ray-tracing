@@ -13,6 +13,18 @@ canvas {
 	height: 100%;
 }
 
+#fps {
+	position: absolute;
+	right: 0;
+	top: 0;
+
+	font-size: 1.4em;
+	margin: 0.3em 0.5em;
+	color: white;
+	text-shadow: 0 0 0.3em #000, 0 0 0.7em #000;
+	user-select: none;
+}
+
 #error {
 	margin: 2em 20%;
 }
