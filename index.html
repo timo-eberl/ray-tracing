@@ -8,27 +8,9 @@
 </head>
 
 <body>
-	<p id="error" style="background-color: #bd2337; color: white;	padding: 1em;"></p>
 	<p id="fps"></p>
 	<canvas></canvas>
 </body>
-
-<!-- put scripts at the end, so they can reference html elements -->
-<script>
-	// check if the static file server is configured correctly
-	if (!location.hostname) {
-		displayError(
-			"You need to open this page with a local static file server!"
-			+ " For more information check the README."
-		);
-	}
-
-	function displayError(text) {
-		// display errors in the html document, so they can't be missed
-		document.querySelector("#error").textContent = text;
-		console.error(text);
-	}
-</script>
 
 <script src="utils.js"></script>
 <script src="main.js"></script>

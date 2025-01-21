@@ -4,12 +4,10 @@ async function main() {
 	requestAnimationFrame(render);
 }
 
-// this data is set in initialize() and used in render()
-let gl;
+let gl = document.querySelector("canvas").getContext("webgl2", { alpha: false });
 let program;
 let vao;
 let uniformModelMatrixLocation;
-let uniformViewMatrixLocation;
 let uniformProjectionMatrixLocation;
 let uniformAspectRatioLocation;
 let uniformCameraRotationLocation;
@@ -31,9 +29,8 @@ function measureFPSLoop() {
 }
 
 function setupCameraControls() {
-	const canvas = document.querySelector("canvas");
 	// set isMouseDown to true if mouse button 0 is pressed while the cursor is on the canvas
-	canvas.onmousedown = function(event) { if(event.button === 0) {isMouseDown = true} };
+	gl.canvas.onmousedown = function(event) { if(event.button === 0) {isMouseDown = true} };
 	// set isMosueDown to false if mouse button 0 is released (no matter where the cursor is)
 	document.onmouseup = function(event) { if(event.button === 0) {isMouseDown = false} };
 	// update the camera rotation when the mouse is moved
@@ -44,7 +41,7 @@ function setupCameraControls() {
 		}
 	};
 	// zoom with mouse wheel
-	canvas.onwheel = function (event) {
+	gl.canvas.onwheel = function (event) {
 		let delta = event.wheelDeltaY / 120.0; // [-1;1]
 		delta *= -0.08;
 		delta += 1.0; // [0.9 - 1.1]
@@ -143,44 +140,36 @@ function setupCameraControls() {
 	};
 }
 
+// triangle for fullscreen rendering
 const triangleMesh = {
 	positions: [
-		// x     y     z
-		-1.0,  3.0,  0.0, // 0 - top left
-		-1.0, -1.0,  0.0, // 1 - bottom left
-		 3.0, -1.0,  0.0, // 2 - bottom right
+		-1,  3,  0, // top left
+		-1, -1,  0, // bottom left
+		 3, -1,  0, // bottom right
 	],
 	uvs: [
-		0.0, 2.0,
-		0.0, 0.0,
-		2.0, 0.0,
-	],
-	indices: [
-		0, 1, 2,
+		0, 2,
+		0, 0,
+		2, 0,
 	],
 };
 
 async function initialize() {
-	setupCameraControls();
-
-	const canvas = document.querySelector("canvas"); // get the html canvas element
-	// everytime we talk to WebGL we use this object
-	gl = canvas.getContext("webgl2", { alpha: false });
-
 	if (!gl) { console.error("Your browser does not support WebGL2"); }
+
+	setupCameraControls();
 
 	window.onresize = function () {
 		gl.canvas.width = window.innerWidth;
 		gl.canvas.height = window.innerHeight;
-		gl.viewport(0, 0, canvas.width, canvas.height);
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	};
-	window.onresize()
+	window.onresize();
 
-	const vertexShaderText = await loadTextResource("shader.vert");
-	const fragmentShaderText = await loadTextResource("shader.frag");
-	const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderText);
-	const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderText);
-	program = createProgram(gl, vertexShader, fragmentShader);
+	program = createProgram(gl,
+		createShader(gl, gl.VERTEX_SHADER, await loadTextResource("shader.vert")),
+		createShader(gl, gl.FRAGMENT_SHADER, await loadTextResource("shader.frag"))
+	);
 
 	uploadAttributeData();
 
@@ -194,11 +183,6 @@ async function initialize() {
 function uploadAttributeData() {
 	vao = gl.createVertexArray();
 	gl.bindVertexArray(vao);
-
-	const indexBuffer = gl.createBuffer();
-	// gl.ELEMENT_ARRAY_BUFFER tells WebGL that this buffer should be treated as an index list
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangleMesh.indices), gl.STATIC_DRAW);
 
 	const posBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
@@ -214,26 +198,20 @@ function uploadAttributeData() {
 	gl.vertexAttribPointer(uvAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(uvAttributeLocation);
 
-	// unbind to avoid accidental modification
 	gl.bindVertexArray(null); // before other unbinds
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 }
 
 function render(time) {
-	gl.clearColor(0, 0, 0, 1);
+	gl.clearColor(0,0,0,1);
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	gl.useProgram(program);
-
 	gl.bindVertexArray(vao);
-
 	setUniforms();
-	
-	const numVertices = triangleMesh.indices.length;
-	gl.drawElements(gl.TRIANGLES, numVertices, gl.UNSIGNED_SHORT, 0);
 
-	// unbind to avoid accidental modification
+	gl.drawArrays(gl.TRIANGLES, 0, 3);
+
 	gl.bindVertexArray(vao);
 	gl.useProgram(null);
 
@@ -243,11 +221,9 @@ function render(time) {
 }
 
 function setUniforms() {
-	const aspectRatio = gl.canvas.width / gl.canvas.height;
-
-	gl.uniform1fv(uniformAspectRatioLocation, [ aspectRatio ]);
+	gl.uniform1fv(uniformAspectRatioLocation, [ gl.canvas.width / gl.canvas.height ]);
 	gl.uniform2fv(uniformCameraRotationLocation, [
-		cameraRotation.x  * Math.PI / 180, cameraRotation.y  * Math.PI / 180
+		cameraRotation.x * Math.PI / 180, cameraRotation.y * Math.PI / 180
 	]);
 	gl.uniform1fv(uniformCameraDistanceLocation, [ cameraDistance ]);
 	gl.uniform3fv(uniformCameraTargetLocation, [ cameraTarget.x, cameraTarget.y, cameraTarget.z ]);

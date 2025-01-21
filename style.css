@@ -25,18 +25,6 @@ canvas {
 	user-select: none;
 }
 
-#error {
-	margin: 2em 20%;
-}
-
-#error:empty {
-	display: none; /* if no text is set, hide */
-}
-
-label {
-	margin-left: 3em;
-}
-
 /* default color scheme */
 :root {
 	--default-font-color: #303030;
