@@ -205,9 +205,10 @@ vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
 struct LightRay { Ray ray; float contribution; };
 
 const float minContribution = 0.01;
+const float selfOcclusionDelta = 0.01;
 
 void main() {
-	const int lightRaysMaxSize = 15;
+	const int lightRaysMaxSize = 8;
 	LightRay[lightRaysMaxSize] lightRays;
 	int lightRaysSize = 0;
 	// primary ray
@@ -223,38 +224,37 @@ void main() {
 		Ray ray = lightRays[j].ray;
 
 		ObjectIntersection closest;
-		// intersection found: draw closest object
-		if (trace(ray, closest)) {
-			// diffuse shading
-			if (closest.material.diffuseFactor > 0.0) {
-				Ray shadowRay = Ray(closest.intersection.p, lightDirection);
-				shadowRay.p += shadowRay.dir * 0.0001; // fix wrong self occlusion
-				bool isShadowed = traceMin(shadowRay);
-				outColor.xyz += shade(
-					closest.material.albedoColor, float(isShadowed), closest.intersection.n
-				) * closest.material.diffuseFactor * contribution;
-			}
-			// reflection
-			if (closest.material.reflectionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
-				Ray newRay = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
-				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
-				float newContribution = contribution * closest.material.reflectionFactor;
-				lightRays[lightRaysSize] = LightRay(newRay, newContribution);
-				lightRaysSize++;
-			}
-			// refraction
-			if (closest.material.refractionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
-				float eta = 1.0 / closest.material.refractiveIndex;
-				Ray newRay = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
-				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
-				float newContribution = contribution * closest.material.refractionFactor;
-				lightRays[lightRaysSize] = LightRay(newRay, newContribution);
-				lightRaysSize++;
-			}
+		bool isIntersecting = trace(ray, closest);
+		if (!isIntersecting) {
+			outColor.xyz += sky(ray.dir) * contribution; // no intersection found: draw sky
+			continue;
 		}
-		// no intersection found: draw sky
-		else {
-			outColor.xyz += sky(ray.dir) * contribution;
+		// intersection found: draw closest object
+		// diffuse shading
+		if (closest.material.diffuseFactor > 0.0) {
+			Ray shadowRay = Ray(closest.intersection.p, lightDirection);
+			shadowRay.p += closest.intersection.n * selfOcclusionDelta; // fix wrong self occlusion
+			bool isShadowed = traceMin(shadowRay);
+			outColor.xyz += shade(
+				closest.material.albedoColor, float(isShadowed), closest.intersection.n
+			) * closest.material.diffuseFactor * contribution;
+		}
+		// reflection
+		if (closest.material.reflectionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
+			Ray newRay = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
+			newRay.p += closest.intersection.n * selfOcclusionDelta; // fix wrong self occlusion
+			float newContribution = contribution * closest.material.reflectionFactor;
+			lightRays[lightRaysSize] = LightRay(newRay, newContribution);
+			lightRaysSize++;
+		}
+		// refraction
+		if (closest.material.refractionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
+			float eta = 1.0 / closest.material.refractiveIndex;
+			Ray newRay = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
+			newRay.p -= closest.intersection.n * selfOcclusionDelta; // fix wrong self occlusion
+			float newContribution = contribution * closest.material.refractionFactor;
+			lightRays[lightRaysSize] = LightRay(newRay, newContribution);
+			lightRaysSize++;
 		}
 	}
 }
