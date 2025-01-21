@@ -202,24 +202,20 @@ vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
 	return (diffuse + ambient) * albedo;
 }
 
-struct RayTodo { Ray ray; float contribution; bool todo; };
+struct RayTodo { Ray ray; float contribution; };
+
+const float minContribution = 0.01;
 
 void main() {
-	const int raysTodoSize = 10;
+	const int raysTodoSize = 15;
 	RayTodo[raysTodoSize] raysTodo;
-	for (int i = 0; i < raysTodoSize; i++) {
-		raysTodo[i].todo = false;
-	}
 	// primary ray
-	raysTodo[0] = RayTodo(
-		Ray(v_rayPosition, normalize(v_rayDirection)),
-		1.0, true
-	);
+	raysTodo[0] = RayTodo( Ray(v_rayPosition, normalize(v_rayDirection)), 1.0 );
 
 	outColor = vec4(0,0,0,1);
 
 	for (int j = 0; j < raysTodoSize; j++) {
-		if (!raysTodo[j].todo) continue;
+		if (raysTodo[j].contribution < minContribution) continue;
 
 		float contribution = raysTodo[j].contribution;
 		Ray ray = raysTodo[j].ray;
@@ -241,10 +237,9 @@ void main() {
 				Ray newRay = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
 				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
 				for (int k = j+1; k < raysTodoSize; k++) {
-					if (raysTodo[k].todo) continue;
-					raysTodo[k] = RayTodo(
-						newRay, contribution * closest.material.reflectionFactor, true
-					);
+					if (raysTodo[k].contribution >= minContribution) continue;
+					float newContribution = contribution * closest.material.reflectionFactor;
+					raysTodo[k] = RayTodo(newRay, newContribution);
 					break;
 				}
 			}
@@ -254,10 +249,9 @@ void main() {
 				Ray newRay = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
 				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
 				for (int k = j+1; k < raysTodoSize; k++) {
-					if (raysTodo[k].todo) continue;
-					raysTodo[k] = RayTodo(
-						newRay, contribution * closest.material.refractionFactor, true
-					);
+					if (raysTodo[k].contribution >= minContribution) continue;
+					float newContribution = contribution * closest.material.refractionFactor;
+					raysTodo[k] = RayTodo(newRay, newContribution);
 					break;
 				}
 			}
