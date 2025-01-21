@@ -202,23 +202,25 @@ vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
 	return (diffuse + ambient) * albedo;
 }
 
-struct RayTodo { Ray ray; float contribution; };
+struct LightRay { Ray ray; float contribution; };
 
 const float minContribution = 0.01;
 
 void main() {
-	const int raysTodoSize = 15;
-	RayTodo[raysTodoSize] raysTodo;
+	const int lightRaysMaxSize = 15;
+	LightRay[lightRaysMaxSize] lightRays;
+	int lightRaysSize = 0;
 	// primary ray
-	raysTodo[0] = RayTodo( Ray(v_rayPosition, normalize(v_rayDirection)), 1.0 );
+	lightRays[lightRaysSize] = LightRay( Ray(v_rayPosition, normalize(v_rayDirection)), 1.0 );
+	lightRaysSize++;
 
 	outColor = vec4(0,0,0,1);
 
-	for (int j = 0; j < raysTodoSize; j++) {
-		if (raysTodo[j].contribution < minContribution) continue;
+	for (int j = 0; j < lightRaysSize; j++) {
+		if (lightRays[j].contribution < minContribution) continue;
 
-		float contribution = raysTodo[j].contribution;
-		Ray ray = raysTodo[j].ray;
+		float contribution = lightRays[j].contribution;
+		Ray ray = lightRays[j].ray;
 
 		ObjectIntersection closest;
 		// intersection found: draw closest object
@@ -233,27 +235,21 @@ void main() {
 				) * closest.material.diffuseFactor * contribution;
 			}
 			// reflection
-			if (closest.material.reflectionFactor > 0.0) {
+			if (closest.material.reflectionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
 				Ray newRay = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
 				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
-				for (int k = j+1; k < raysTodoSize; k++) {
-					if (raysTodo[k].contribution >= minContribution) continue;
-					float newContribution = contribution * closest.material.reflectionFactor;
-					raysTodo[k] = RayTodo(newRay, newContribution);
-					break;
-				}
+				float newContribution = contribution * closest.material.reflectionFactor;
+				lightRays[lightRaysSize] = LightRay(newRay, newContribution);
+				lightRaysSize++;
 			}
 			// refraction
-			if (closest.material.refractionFactor > 0.0) {
+			if (closest.material.refractionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
 				float eta = 1.0 / closest.material.refractiveIndex;
 				Ray newRay = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
 				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
-				for (int k = j+1; k < raysTodoSize; k++) {
-					if (raysTodo[k].contribution >= minContribution) continue;
-					float newContribution = contribution * closest.material.refractionFactor;
-					raysTodo[k] = RayTodo(newRay, newContribution);
-					break;
-				}
+				float newContribution = contribution * closest.material.refractionFactor;
+				lightRays[lightRaysSize] = LightRay(newRay, newContribution);
+				lightRaysSize++;
 			}
 		}
 		// no intersection found: draw sky
