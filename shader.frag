@@ -205,26 +205,41 @@ vec3 shade(vec3 albedo, float occlusion, vec3 normal) {
 struct LightRay { Ray ray; float contribution; };
 
 const float minContribution = 0.01;
+const int treeDepth = 3;
 
 void main() {
-	const int lightRaysMaxSize = 15;
-	LightRay[lightRaysMaxSize] lightRays;
-	int lightRaysSize = 0;
+	const int lightRaysSize = (1 << (treeDepth+1)) - 1; // 2 ^ (treeDepth+1) - 1
+	LightRay[lightRaysSize] lightRays;
+	// keep track of how much all rays of a tree depth will contribute
+	float [treeDepth+1] treeDepthContributions;
+
 	// primary ray
-	lightRays[lightRaysSize] = LightRay( Ray(v_rayPosition, normalize(v_rayDirection)), 1.0 );
-	lightRaysSize++;
+	lightRays[0] = LightRay( Ray(v_rayPosition, normalize(v_rayDirection)), 1.0 );
+	treeDepthContributions[0] = 1.0;
 
 	outColor = vec4(0,0,0,1);
 
-	for (int j = 0; j < lightRaysSize; j++) {
-		if (lightRays[j].contribution < minContribution) continue;
+	for (int i = 0; i < treeDepth+1; i++) {
+		// exit early if the contribution of all rays at the current tree depth is negligible
+		if (treeDepthContributions[i] < minContribution) break;
 
-		float contribution = lightRays[j].contribution;
-		Ray ray = lightRays[j].ray;
+		int jCount = 1 << i; // numer of rays at current tree depth = 2^i
+		int njCount = 2*jCount; // number of rays at next tree depth
+		for (int j = 0; j < jCount; j++) {
+			int rayIndex = jCount - 1 + j; // total number of rays before current tree depth + j
+			float contribution = lightRays[rayIndex].contribution;
+			Ray ray = lightRays[rayIndex].ray;
 
-		ObjectIntersection closest;
-		// intersection found: draw closest object
-		if (trace(ray, closest)) {
+			if (contribution < minContribution) continue;
+
+			ObjectIntersection closest;
+			bool isIntersecting = trace(ray, closest);
+			if (!isIntersecting) {
+				// no intersection found: draw sky
+				outColor.xyz += sky(ray.dir) * contribution;
+				continue;
+			}
+			// intersection found: draw closest object
 			// diffuse shading
 			if (closest.material.diffuseFactor > 0.0) {
 				Ray shadowRay = Ray(closest.intersection.p, lightDirection);
@@ -234,27 +249,29 @@ void main() {
 					closest.material.albedoColor, float(isShadowed), closest.intersection.n
 				) * closest.material.diffuseFactor * contribution;
 			}
+			// if we are at the last tree depth, skip reflection and refraction
+			if (i >= treeDepth) continue;
 			// reflection
-			if (closest.material.reflectionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
+			if (closest.material.reflectionFactor > 0.0) {
 				Ray newRay = Ray(closest.intersection.p, reflect(ray.dir, closest.intersection.n));
 				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
 				float newContribution = contribution * closest.material.reflectionFactor;
-				lightRays[lightRaysSize] = LightRay(newRay, newContribution);
-				lightRaysSize++;
+				int newRayIndex = njCount - 1 + 2*j;
+				lightRays[newRayIndex] = LightRay(newRay, newContribution);
+				treeDepthContributions[i+1] += newContribution;
 			}
 			// refraction
-			if (closest.material.refractionFactor > 0.0 && lightRaysSize < lightRaysMaxSize) {
+			if (closest.material.refractionFactor > 0.0) {
 				float eta = 1.0 / closest.material.refractiveIndex;
-				Ray newRay = Ray(closest.intersection.p, refract(ray.dir, closest.intersection.n, eta));
+				Ray newRay = Ray(
+					closest.intersection.p, refract(ray.dir, closest.intersection.n, eta)
+				);
 				newRay.p += newRay.dir * 0.0001; // fix wrong self occlusion
 				float newContribution = contribution * closest.material.refractionFactor;
-				lightRays[lightRaysSize] = LightRay(newRay, newContribution);
-				lightRaysSize++;
+				int newRayIndex = njCount + 2*j;
+				lightRays[newRayIndex] = LightRay(newRay, newContribution);
+				treeDepthContributions[i+1] += newContribution;
 			}
-		}
-		// no intersection found: draw sky
-		else {
-			outColor.xyz += sky(ray.dir) * contribution;
 		}
 	}
 }
