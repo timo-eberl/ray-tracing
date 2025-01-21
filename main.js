@@ -1,6 +1,7 @@
 async function main() {
 	await initialize();
 	requestAnimationFrame(render);
+	measureFPSLoop();
 }
 
 // this data is set in initialize() and used in render()
@@ -19,6 +20,15 @@ let cameraDistance = 5;
 let cameraRotation = { x: 15, y: 0 };
 let cameraTarget = { x: 0, y: 1, z: 0 };
 let isMouseDown = false;
+let frameCount = 0;
+
+function measureFPSLoop() {
+	document.querySelector("#fps").textContent = frameCount + " FPS"
+	frameCount = 0;
+	setTimeout(function () {
+		measureFPSLoop();
+	}, 1000);
+}
 
 function setupCameraControls() {
 	const canvas = document.querySelector("canvas");
@@ -229,6 +239,8 @@ function render(time) {
 	// unbind to avoid accidental modification
 	gl.bindVertexArray(vao);
 	gl.useProgram(null);
+
+	frameCount++;
 
 	requestAnimationFrame(render);
 }
